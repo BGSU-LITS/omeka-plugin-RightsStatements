@@ -23,7 +23,9 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
     /**
      * @var array Plugin options.
      */
-    protected $_options = array();
+    protected $_options = array(
+        'rights_statements_preference' => ''
+    );
 
     /**
      * Domains with rights statements and accompanying details.
@@ -111,6 +113,18 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
     }
 
     /**
+     * Hook to plugin upgrade.
+     *
+     * @param array $args Contains: `old_version` and `new_version`.
+     */
+    public function hookUpgrade($args)
+    {
+        if (version_compare($args['old_version'], '1.1', '<=')) {
+            set_option('rights_statements_preference', '');
+        }
+    }
+
+    /**
      * Hook to plugin configuration form submission.
      *
      * Sets options submitted by the configuration form.
@@ -180,41 +194,48 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
         // Unused.
         $args;
 
-        if (filter_var($text, FILTER_VALIDATE_URL)) {
-            $parts = parse_url($text);
+        if (is_admin_theme() || !filter_var($text, FILTER_VALIDATE_URL)) {
+            return $text;
+        }
 
-            foreach ($this->domains as $domain => $data) {
-                if ($parts['host'] !== $domain) {
-                    continue;
-                }
+        $preference = get_option('rights_statements_preference');
+        $parts = parse_url($text);
 
-                if (!preg_match($data['pattern'], $parts['path'], $matches)) {
-                    continue;
-                }
-
-                if (!isset($data['licenses'][$matches[2]])) {
-                    continue;
-                }
-
-                $prefix = 'rights_statements_' .
-                    str_replace('.', '_', $domain);
-                $format = get_option($prefix . '_format');
-                $height = get_option($prefix . '_height');
-
-                if ($format === 'disabled') {
-                    continue;
-                }
-
-                $text =
-                    '<p class="rights-statements">' .
-                    '<a href="http://'. $domain . '/' . $matches[1] . '/' .
-                        $matches[2] . '/' . $matches[3] . '/">' .
-                    '<img src="' . web_path_to(
-                        $domain . '/' . $format . '/' .
-                        $matches[2] . '.svg'). '"' .
-                    ' alt="' . $data['licenses'][$matches[2]] . '"' .
-                    ' height="' . $height . '"></a></p>';
+        foreach ($this->domains as $domain => $data) {
+            if ($parts['host'] !== $domain) {
+                continue;
             }
+
+            if (!preg_match($data['pattern'], $parts['path'], $matches)) {
+                continue;
+            }
+
+            if (!isset($data['licenses'][$matches[2]])) {
+                continue;
+            }
+
+            $prefix = 'rights_statements_' .
+                str_replace('.', '_', $domain);
+            $format = get_option($prefix . '_format');
+            $height = get_option($prefix . '_height');
+
+            if ($format === 'disabled') {
+                continue;
+            }
+
+            if ($preference && $domain !== $preference) {
+                return '';
+            }
+
+            $text =
+                '<p class="rights-statements">' .
+                '<a href="http://'. $domain . '/' . $matches[1] . '/' .
+                    $matches[2] . '/' . $matches[3] . '/">' .
+                '<img src="' . web_path_to(
+                    $domain . '/' . $format . '/' .
+                    $matches[2] . '.svg'). '"' .
+                ' alt="' . $data['licenses'][$matches[2]] . '"' .
+                ' height="' . $height . '"></a></p>';
         }
 
         return $text;

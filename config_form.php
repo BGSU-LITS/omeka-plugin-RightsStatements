@@ -1,3 +1,23 @@
+<div class="field">
+    <div class="two columns alpha">
+        <label for="rights_statements_preference">Image Preference</label>
+    </div>
+    <div class="inputs five columns omega">
+        <label>
+            <input type="radio" name="rights_statements_preference"
+                value=""<?php if (!get_option('rights_statements_preference')) echo ' checked'; ?>>
+            Display All
+        </label>
+        <?php foreach ($this->domains as $domain => $data): ?>
+            <label>
+                <input type="radio" name="rights_statements_preference"
+                    value="<?php echo $domain; ?>"<?php if (get_option('rights_statements_preference') === $domain) echo ' checked'; ?>>
+                <?php echo $domain; ?>
+            </label>
+        <?php endforeach; ?>
+    </div>
+</div>
+
 <?php foreach ($this->domains as $domain => $data): ?>
     <?php
     $prefix = 'rights_statements_' . str_replace('.', '_', $domain);
