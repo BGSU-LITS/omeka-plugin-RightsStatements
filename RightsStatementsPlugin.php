@@ -150,15 +150,68 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
 
     public function hookAdminItemsBrowseDetailedEach($args)
     {
-        $rights = metadata(
-            $args['item'],
+        $output = array();
+
+        foreach ($this->getRights($args['item']) as $right) {
+            $output[] = $right['license'];
+        }
+
+        if ($output) {
+            echo '<div class="rights-statements"><strong>Rights:</strong> ';
+            echo implode(', ', $output);
+            echo '</div>';
+        }
+    }
+
+    public function rightsStatement($text, $args)
+    {
+        if (is_admin_theme()) {
+            return $text;
+        }
+
+        $rights = $this->getRights($args['record']);
+
+        if (!isset($rights[$text])) {
+            return $text;
+        }
+
+        $pref = get_option('rights_statements_preference');
+
+        if ($pref) {
+            foreach ($rights as $right) {
+                if ($right['domain'] === $pref && $right !== $rights[$text]) {
+                    return '';
+                }
+            }
+        }
+
+        return
+            '<p class="rights-statements">' .
+            '<a href="http://'.
+                $rights[$text]['domain'] . '/' .
+                $rights[$text]['matches'][1] . '/' .
+                $rights[$text]['matches'][2] . '/' .
+                $rights[$text]['matches'][3] . '/">' .
+            '<img src="' . web_path_to(
+                $rights[$text]['domain'] . '/' .
+                $rights[$text]['format'] . '/' .
+                $rights[$text]['matches'][2] . '.svg'
+            ). '" alt="' .
+                $rights[$text]['license'] . '" height="' .
+                $rights[$text]['height'] . '"></a></p>';
+    }
+
+    private function getRights($record)
+    {
+        $rights = array();
+
+        $texts = metadata(
+            $record,
             array('Dublin Core', 'Rights'),
             array('all' => true, 'no_escape' => true, 'no_filter' => true)
         );
 
-        $output = array();
-
-        foreach ($rights as $text) {
+        foreach ($texts as $text) {
             if (!filter_var($text, FILTER_VALIDATE_URL)) {
                 continue;
             }
@@ -178,66 +231,24 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
                     continue;
                 }
 
-                $output[] = $data['licenses'][$matches[2]];
+                $prefix = 'rights_statements_' .
+                    str_replace('.', '_', $domain);
+                $format = get_option($prefix . '_format');
+
+                if ($format === 'disabled') {
+                    continue;
+                }
+
+                $rights[$text] = array(
+                    'domain' => $domain,
+                    'format' => $format,
+                    'height' => get_option($prefix . '_height'),
+                    'license' => $data['licenses'][$matches[2]],
+                    'matches' => $matches
+                );
             }
         }
 
-        if ($output) {
-            echo '<div class="rights-statements"><strong>Rights:</strong> ';
-            echo implode(', ', $output);
-            echo '</div>';
-        }
-    }
-
-    public function rightsStatement($text, $args)
-    {
-        // Unused.
-        $args;
-
-        if (is_admin_theme() || !filter_var($text, FILTER_VALIDATE_URL)) {
-            return $text;
-        }
-
-        $preference = get_option('rights_statements_preference');
-        $parts = parse_url($text);
-
-        foreach ($this->domains as $domain => $data) {
-            if ($parts['host'] !== $domain) {
-                continue;
-            }
-
-            if (!preg_match($data['pattern'], $parts['path'], $matches)) {
-                continue;
-            }
-
-            if (!isset($data['licenses'][$matches[2]])) {
-                continue;
-            }
-
-            $prefix = 'rights_statements_' .
-                str_replace('.', '_', $domain);
-            $format = get_option($prefix . '_format');
-            $height = get_option($prefix . '_height');
-
-            if ($format === 'disabled') {
-                continue;
-            }
-
-            if ($preference && $domain !== $preference) {
-                return '';
-            }
-
-            $text =
-                '<p class="rights-statements">' .
-                '<a href="http://'. $domain . '/' . $matches[1] . '/' .
-                    $matches[2] . '/' . $matches[3] . '/">' .
-                '<img src="' . web_path_to(
-                    $domain . '/' . $format . '/' .
-                    $matches[2] . '.svg'). '"' .
-                ' alt="' . $data['licenses'][$matches[2]] . '"' .
-                ' height="' . $height . '"></a></p>';
-        }
-
-        return $text;
+        return $rights;
     }
 }
