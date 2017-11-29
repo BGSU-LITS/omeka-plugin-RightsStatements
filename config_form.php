@@ -18,6 +18,16 @@
     </div>
 </div>
 
+<div class="field">
+    <div class="two columns alpha">
+        <label for="rights_statements_target">Open in New Window</label>
+    </div>
+    <div class="inputs five columns omega">
+        <input type="hidden" name="rights_statements_target" value="">
+        <input type="checkbox" name="rights_statements_target" id="rights_statements_target" value="1"<?php if (get_option('rights_statements_target')) echo ' checked'; ?>>
+    </div>
+</div>
+
 <?php foreach ($this->domains as $domain => $data): ?>
     <?php
     $prefix = 'rights_statements_' . str_replace('.', '_', $domain);

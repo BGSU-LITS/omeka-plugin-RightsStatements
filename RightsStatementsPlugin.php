@@ -24,7 +24,8 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
      * @var array Plugin options.
      */
     protected $_options = array(
-        'rights_statements_preference' => ''
+        'rights_statements_preference' => '',
+        'rights_statements_target' => ''
     );
 
     /**
@@ -122,6 +123,10 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
         if (version_compare($args['old_version'], '1.1', '<=')) {
             set_option('rights_statements_preference', '');
         }
+
+        if (version_compare($args['old_version'], '1.2', '<=')) {
+            set_option('rights_statements_target', '');
+        }
     }
 
     /**
@@ -185,13 +190,16 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
             }
         }
 
+        $target = get_option('rights_statements_target');
+
         return
             '<p class="rights-statements">' .
             '<a href="http://'.
                 $rights[$text]['domain'] . '/' .
                 $rights[$text]['matches'][1] . '/' .
                 $rights[$text]['matches'][2] . '/' .
-                $rights[$text]['matches'][3] . '/">' .
+                $rights[$text]['matches'][3] . '/"' .
+                ($target ? ' target="_blank"' : '') . '>' .
             '<img src="' . web_path_to(
                 $rights[$text]['domain'] . '/' .
                 $rights[$text]['format'] . '/' .
