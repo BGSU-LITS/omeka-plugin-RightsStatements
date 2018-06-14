@@ -1,5 +1,17 @@
 <?php
+/**
+ * Omeka Rights Statements Plugin
+ *
+ * @author John Kloor <kloor@bgsu.edu>
+ * @copyright 2018 Bowling Green State University Libraries
+ * @license MIT
+ */
 
+/**
+ * Omeka Rights Statements Plugin: Plugin Class
+ *
+ * @package RightsStatements
+ */
 class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
 {
     /**
@@ -33,8 +45,14 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
      * @var array
      */
     private $domains = array(
+        // Rights Statements
         'rightsstatements.org' => array(
+            // Domain and pattern matches these examples:
+            // http://rightsstatements.org/page/CNE/1.0/
+            // http://rightsstatements.org/vocab/CNE/1.0/
             'pattern' => '{^/(page|vocab)/([A-Z-]+)/([\d.]+)/?$}i',
+
+            // See http://rightsstatements.org/page/1.0/
             'licenses' => array(
                 'CNE' => 'Copyright Not Evaluated',
                 'InC' =>  'In Copyright',
@@ -49,6 +67,8 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
                 'NoC-US' => 'No Copyright - In the United States',
                 'UND' => 'Copyright Undetermined'
             ),
+
+            // See http://rightsstatements.org/en/documentation/assets.html
             'formats' => array(
                 'dark-white-interior-blue-type' => 50,
                 'dark-white-interior' => 50,
@@ -56,8 +76,15 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
                 'white' => 50
             )
         ),
+
+        // Creative Commons
         'creativecommons.org' => array(
+            // Domain and pattern matches these examples:
+            // https://creativecommons.org/licenses/by/4.0/
+            // https://creativecommons.org/publicdomain/mark/1.0/
             'pattern' => '{^/(licenses|publicdomain)/([A-Z-]+)/([\d.]+)/?$}i',
+
+            // See https://creativecommons.org/licenses/
             'licenses' => array(
                 'by' => 'CC BY',
                 'by-nc' => 'CC BY-NC',
@@ -68,12 +95,12 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
                 'mark' => 'Public Domain Mark',
                 'zero' => 'CC0 Public Domain'
             ),
+
+            // See https://licensebuttons.net/
             'formats' => array(
                 '88x31' => 31,
                 '80x15' => 15
-            ),
-            'format' => '88x31',
-            'height' => 31
+            )
         )
     );
 
@@ -84,6 +111,7 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
      */
     public function __construct()
     {
+        // Setup height and format options for each domain.
         foreach ($this->domains as $domain => $data) {
             $prefix = 'rights_statements_' . str_replace('.', '_', $domain);
             $this->_options[$prefix . '_height'] = reset($data['formats']);
@@ -153,14 +181,20 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
         include 'config_form.php';
     }
 
+    /**
+     * Hook into admin item browse to display rights in details.
+     * @param array $args Arguments to the hook.
+     */
     public function hookAdminItemsBrowseDetailedEach($args)
     {
+        // Obtain the name of all licenses applied to the item.
         $output = array();
 
         foreach ($this->getRights($args['item']) as $right) {
             $output[] = $right['license'];
         }
 
+        // If there are licenses, append them to the details.
         if ($output) {
             echo '<div class="rights-statements"><strong>Rights:</strong> ';
             echo implode(', ', $output);
@@ -168,18 +202,29 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
         }
     }
 
+    /**
+     * Filter public display of DC Rights to link image of rights statement.
+     * @param string $text Text of the rights statement to filter.
+     * @param array $args Arguments to the filter.
+     * @return string Text to display for the rights statement.
+     */
     public function rightsStatement($text, $args)
     {
+        // Do not display linked image in the admin interface.
         if (is_admin_theme()) {
             return $text;
         }
 
+        // Obtain all rights statements applied to the record.
         $rights = $this->getRights($args['record']);
 
+        // If the current DC Rights text is not a statement, return as-is.
         if (!isset($rights[$text])) {
             return $text;
         }
 
+        // If a preferred domain was specified, check that the current text
+        // is from that domain, or that domain is not specified in other text.
         $pref = get_option('rights_statements_preference');
 
         if ($pref) {
@@ -190,8 +235,10 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
             }
         }
 
+        // Check if the link should target a new window.
         $target = get_option('rights_statements_target');
 
+        // Return a linked image for the rights statement.
         return
             '<p class="rights-statements">' .
             '<a href="http://'.
@@ -209,10 +256,16 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
                 $rights[$text]['height'] . '"></a></p>';
     }
 
+    /**
+     * Get all rights statements for an record.
+     * @param Object $record The record to retrieve rights statements from.
+     * @return array Details of the rights statements for the record.
+     */
     private function getRights($record)
     {
         $rights = array();
 
+        // Retrieve all of the DC Rights texts from the record.
         $texts = metadata(
             $record,
             array('Dublin Core', 'Rights'),
@@ -220,33 +273,41 @@ class RightsStatementsPlugin extends Omeka_Plugin_AbstractPlugin
         );
 
         foreach ($texts as $text) {
+            // Only process texts that are valid URLs.
             if (!filter_var($text, FILTER_VALIDATE_URL)) {
                 continue;
             }
 
+            // Parse the URL into parts.
             $parts = parse_url($text);
 
             foreach ($this->domains as $domain => $data) {
+                // Only parse domains that match the URL.
                 if ($parts['host'] !== $domain) {
                     continue;
                 }
 
+                // Only parse paths that match the patter.
                 if (!preg_match($data['pattern'], $parts['path'], $matches)) {
                     continue;
                 }
 
+                // Only pass URLs for known licenses.
                 if (!isset($data['licenses'][$matches[2]])) {
                     continue;
                 }
 
+                // Get the format for the statement.
                 $prefix = 'rights_statements_' .
                     str_replace('.', '_', $domain);
                 $format = get_option($prefix . '_format');
 
+                // If the format is disabled, do not process the statement.
                 if ($format === 'disabled') {
                     continue;
                 }
 
+                // Add the statement to the result.
                 $rights[$text] = array(
                     'domain' => $domain,
                     'format' => $format,
